@@ -24,7 +24,7 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
 
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cache/go-build
@@ -91,7 +91,7 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
 
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v3
+      uses: golangci/golangci-lint-action@v6
       with:
         version: latest
         working-directory: ./src
@@ -116,6 +116,6 @@ jobs:
         args: '-fmt sarif -out gosec-results.sarif ./src/...'
 
     - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: gosec-results.sarif 
