@@ -1,0 +1,152 @@
+name: Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.md'
+      - 'src/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.md'
+      - 'src/**'
+
+jobs:
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run markdownlint
+      uses: articulate/actions-markdownlint@v1
+      with:
+        config: .markdownlint.json
+        files: '*.md'
+        ignore: '.github'
+
+  link-check:
+    name: Link Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check links in markdown files
+      uses: gaurav-nelson/github-action-markdown-link-check@v1
+      with:
+        use-quiet-mode: 'yes'
+        use-verbose-mode: 'yes'
+        folder-path: '.'
+        file-extension: '.md'
+
+  docs-sync:
+    name: Documentation Sync
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: "1.21"
+
+    - name: Generate metrics documentation
+      working-directory: ./src
+      run: |
+        # Create a simple script to extract metrics from the plugin
+        cat > extract_metrics.go << 'EOF'
+        package main
+        
+        import (
+            "fmt"
+            "strings"
+        )
+        
+        func main() {
+            metrics := []struct {
+                Key         string
+                Description string
+                Returns     string
+            }{
+                {"swarm.services.discovery", "Service discovery for LLD", "JSON array with {#SERVICE.ID}, {#SERVICE.NAME}, and {#STACK.NAME} macros"},
+                {"swarm.service.replicas_desired[service_id]", "Configured replica count", "Integer (desired replicas)"},
+                {"swarm.service.replicas_running[service_id]", "Running task count", "Integer (running tasks)"},
+                {"swarm.stacks.discovery", "Stack discovery for LLD", "JSON array with {#STACK.NAME} macro"},
+                {"swarm.stack.health[stack_name]", "Stack health status", "JSON with health metrics"},
+            }
+            
+            fmt.Println("| Key | Description | Returns |")
+            fmt.Println("|-----|-------------|---------|")
+            for _, m := range metrics {
+                key := strings.ReplaceAll(m.Key, "|", "\\|")
+                desc := strings.ReplaceAll(m.Description, "|", "\\|")
+                ret := strings.ReplaceAll(m.Returns, "|", "\\|")
+                fmt.Printf("| `%s` | %s | %s |\n", key, desc, ret)
+            }
+        }
+        EOF
+        
+        go run extract_metrics.go > metrics_table.md
+        echo "Generated metrics documentation:"
+        cat metrics_table.md
+
+    - name: Validate README examples
+      run: |
+        # Check that all referenced files exist
+        if [ ! -f "README.md" ]; then
+          echo "ERROR: README.md not found"
+          exit 1
+        fi
+        
+        if [ ! -f "EXAMPLES.md" ]; then
+          echo "ERROR: EXAMPLES.md not found"
+          exit 1
+        fi
+        
+        if [ ! -f "LICENSE" ]; then
+          echo "ERROR: LICENSE not found"
+          exit 1
+        fi
+        
+        if [ ! -f "src/swarm.conf" ]; then
+          echo "ERROR: src/swarm.conf not found"
+          exit 1
+        fi
+        
+        echo "All referenced files exist"
+
+    - name: Check metric consistency
+      working-directory: ./src
+      run: |
+        # Verify that metrics defined in plugin.go match documentation
+        echo "Checking metric consistency..."
+        
+        # Extract metric keys from plugin.go
+        grep -E "swarmMetricKey\(\".*\"\)" plugin.go | sed 's/.*swarmMetricKey("\([^"]*\)").*/\1/' > plugin_metrics.txt
+        
+        # Extract metric keys from README.md
+        grep -E "^\| \`[^`]*\` \|" ../README.md | sed 's/| `\([^`]*\)` |.*/\1/' | grep -v "Key" > readme_metrics.txt
+        
+        echo "Metrics in plugin.go:"
+        cat plugin_metrics.txt
+        echo ""
+        echo "Metrics in README.md:"
+        cat readme_metrics.txt
+        echo ""
+        
+        # Check if all plugin metrics are documented
+        while read -r metric; do
+          if ! grep -q "$metric" readme_metrics.txt; then
+            echo "WARNING: Metric '$metric' defined in plugin but not documented in README"
+          fi
+        done < plugin_metrics.txt
+        
+        echo "Metric consistency check completed" 

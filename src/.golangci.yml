@@ -1,0 +1,82 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(golang.zabbix.com)
+  gofmt:
+    simplify: true
+  goimports:
+    local-prefixes: golang.zabbix.com
+  golint:
+    min-confidence: 0
+  govet:
+    check-shadowing: true
+  misspell:
+    locale: US
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - checkPrivateReceivers
+          - sayRepetitiveInsteadOfStutters
+
+linters:
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - errcheck
+    - exportloopref
+    - gci
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - revive
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+
+  disable:
+    - funlen
+    - gochecknoglobals
+    - godox
+    - wsl
+
+issues:
+  exclude-rules:
+    # Disable certain linters for generated code
+    - path: ".*_test\\.go"
+      linters:
+        - gocognit
+        - goconst
+        - gocyclo
+    
+    # Allow globals in main.go for plugin variables
+    - path: "main\\.go"
+      linters:
+        - gochecknoglobals
+
+  max-issues-per-linter: 0
+  max-same-issues: 0 

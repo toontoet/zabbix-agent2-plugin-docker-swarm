@@ -251,6 +251,64 @@ make build-all
 make clean
 ```
 
+### GitHub Actions Workflows
+
+This project includes several automated workflows:
+
+- **🔄 CI (Continuous Integration)**: Runs on every push and PR
+  - Code formatting checks (`go fmt`)
+  - Linting with `golangci-lint`
+  - Security scanning with `gosec`
+  - Cross-platform builds (x86_64 and ARM64)
+
+- **🚀 Release**: Triggered by version tags (e.g., `v1.0.0`)
+  - Builds binaries for both architectures
+  - Creates GitHub releases with download links
+  - Includes checksums and complete packages
+  - Auto-generates release notes
+
+- **📚 Documentation**: Validates documentation
+  - Markdown linting
+  - Link checking
+  - Metric consistency validation
+
+### Creating a Release
+
+To create a new release:
+
+1. **Update version** in `src/main.go`:
+   ```go
+   PLUGIN_VERSION_MAJOR = 1
+   PLUGIN_VERSION_MINOR = 1
+   PLUGIN_VERSION_PATCH = 0
+   PLUGIN_VERSION_RC    = ""  // Remove "alpha1" for stable release
+   ```
+
+2. **Commit changes**:
+   ```bash
+   git add .
+   git commit -m "Release v1.1.0"
+   git push origin main
+   ```
+
+3. **Create and push tag**:
+   ```bash
+   git tag v1.1.0
+   git push origin v1.1.0
+   ```
+
+4. **Automatic release**: GitHub Actions will automatically:
+   - Build binaries for x86_64 and ARM64
+   - Create a GitHub release
+   - Upload binaries and packages
+   - Generate release notes
+
+### Download URLs
+
+After release, binaries will be available at:
+- **x86_64**: `https://github.com/owner/repo/releases/download/v1.1.0/docker-swarm-linux-amd64`
+- **ARM64**: `https://github.com/owner/repo/releases/download/v1.1.0/docker-swarm-linux-arm64`
+
 ### Project Structure
 ```
 zabbix-agent2-plugin-docker-swarm/

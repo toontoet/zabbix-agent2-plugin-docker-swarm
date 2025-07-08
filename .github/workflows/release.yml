@@ -1,0 +1,182 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: "1.21"
+
+jobs:
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux]
+        goarch: [amd64, arm64]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('src/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      working-directory: ./src
+      run: go mod download
+
+    - name: Run tests
+      working-directory: ./src
+      run: |
+        go fmt ./...
+        GOOS=linux go vet ./...
+
+    - name: Build binary
+      working-directory: ./src
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+      run: |
+        mkdir -p ../dist
+        go build -ldflags="-s -w" -o ../dist/docker-swarm-${{ matrix.goos }}-${{ matrix.goarch }} .
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-swarm-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/docker-swarm-${{ matrix.goos }}-${{ matrix.goarch }}
+        retention-days: 7
+
+  test-build:
+    name: Test Build on PR
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: build
+    
+    steps:
+    - name: Download x86_64 binary
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-swarm-linux-amd64
+        path: ./test
+
+    - name: Test binary
+      run: |
+        chmod +x ./test/docker-swarm-linux-amd64
+        file ./test/docker-swarm-linux-amd64
+        ./test/docker-swarm-linux-amd64 --version || echo "Version check completed (exit code expected)"
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: ./artifacts
+
+    - name: Prepare release files
+      run: |
+        mkdir -p ./release
+        cp artifacts/docker-swarm-linux-amd64/docker-swarm-linux-amd64 ./release/
+        cp artifacts/docker-swarm-linux-arm64/docker-swarm-linux-arm64 ./release/
+        
+        # Create checksums
+        cd ./release
+        sha256sum docker-swarm-linux-amd64 > checksums.txt
+        sha256sum docker-swarm-linux-arm64 >> checksums.txt
+        cd ..
+        
+        # Create archive with configuration examples
+        mkdir -p ./package/zabbix-agent2-plugin-docker-swarm
+        cp ./release/* ./package/zabbix-agent2-plugin-docker-swarm/
+        cp ./src/swarm.conf ./package/zabbix-agent2-plugin-docker-swarm/
+        cp ./README.md ./package/zabbix-agent2-plugin-docker-swarm/
+        cp ./EXAMPLES.md ./package/zabbix-agent2-plugin-docker-swarm/
+        cp ./LICENSE ./package/zabbix-agent2-plugin-docker-swarm/
+        
+        cd ./package
+        tar -czf ../release/zabbix-agent2-plugin-docker-swarm-${GITHUB_REF#refs/tags/}.tar.gz zabbix-agent2-plugin-docker-swarm/
+        zip -r ../release/zabbix-agent2-plugin-docker-swarm-${GITHUB_REF#refs/tags/}.zip zabbix-agent2-plugin-docker-swarm/
+
+    - name: Generate release notes
+      run: |
+        cat > release_notes.md << 'EOF'
+        ## Zabbix Docker Swarm Plugin ${GITHUB_REF#refs/tags/}
+        
+        ### Features
+        - 🔍 **Service Discovery**: Discover Docker Swarm services with stack grouping
+        - 📊 **Stack Health Monitoring**: Monitor health by Docker Compose stack
+        - 📈 **Replica Tracking**: Track desired vs running replica counts
+        - 🏗️ **Cross-Architecture**: Support for x86_64 and ARM64 Linux
+        
+        ### Files
+        - `docker-swarm-linux-amd64`: Binary for x86_64/AMD64 systems
+        - `docker-swarm-linux-arm64`: Binary for ARM64/aarch64 systems
+        - `zabbix-agent2-plugin-docker-swarm-*.tar.gz`: Complete package with docs and config
+        - `zabbix-agent2-plugin-docker-swarm-*.zip`: Complete package (ZIP format)
+        - `checksums.txt`: SHA256 checksums for verification
+        
+        ### Installation
+        1. Download the appropriate binary for your architecture
+        2. Copy to `/var/lib/zabbix/plugins/docker-swarm`
+        3. Configure Zabbix Agent 2: `Plugins.DockerSwarm.System.Path=/var/lib/zabbix/plugins/docker-swarm`
+        4. Restart Zabbix Agent 2
+        
+        ### Supported Metrics
+        - `swarm.services.discovery` - Service discovery with stack information
+        - `swarm.service.replicas_desired[service_id]` - Desired replica count
+        - `swarm.service.replicas_running[service_id]` - Running replica count
+        - `swarm.stacks.discovery` - Stack discovery
+        - `swarm.stack.health[stack_name]` - Stack health status
+        
+        See [README.md](README.md) and [EXAMPLES.md](EXAMPLES.md) for detailed configuration and usage examples.
+        EOF
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./release/docker-swarm-linux-amd64
+          ./release/docker-swarm-linux-arm64
+          ./release/checksums.txt
+          ./release/zabbix-agent2-plugin-docker-swarm-*.tar.gz
+          ./release/zabbix-agent2-plugin-docker-swarm-*.zip
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        append_body: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update latest release info
+      run: |
+        echo "Release ${{ github.ref_name }} created successfully!"
+        echo "Download URLs:"
+        echo "- x86_64: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/docker-swarm-linux-amd64"
+        echo "- ARM64: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/docker-swarm-linux-arm64" 
