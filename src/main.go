@@ -20,7 +20,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"os"
 
 	"golang.zabbix.com/sdk/plugin/flag"
@@ -58,7 +57,7 @@ func main() {
 	err := flag.HandleFlags(
 		Name,
 		os.Args[0],
-		fmt.Sprintf(copyrightMessage, PLUGIN_LICENSE_YEAR),
+		copyrightMessage,
 		PLUGIN_VERSION_RC,
 		PLUGIN_VERSION_MAJOR,
 		PLUGIN_VERSION_MINOR,
