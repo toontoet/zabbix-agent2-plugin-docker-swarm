@@ -12,6 +12,10 @@ on:
       - '**.md'
       - 'src/**'
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   markdown-lint:
     name: Markdown Lint
