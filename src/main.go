@@ -1,5 +1,5 @@
 /*
-** Copyright (C) 2001-2025 Zabbix SIA
+** Copyright (C) 2005 Toon Toetenel
 **
 ** Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 ** documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
