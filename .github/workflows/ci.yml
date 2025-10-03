@@ -148,7 +148,23 @@ jobs:
 
     - name: Create dummy SARIF file
       run: |
-        echo '{"version": "2.1.0", "runs": [{"results": []}]}' > gosec-results.sarif
+        cat > gosec-results.sarif << 'EOF'
+        {
+          "version": "2.1.0",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "custom-security-scanner",
+                  "version": "1.0.0",
+                  "informationUri": "https://github.com/your-username/zabbix-agent2-plugin-docker-swarm"
+                }
+              },
+              "results": []
+            }
+          ]
+        }
+        EOF
 
     - name: Upload SARIF file
       uses: github/codeql-action/upload-sarif@v3
