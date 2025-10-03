@@ -35,10 +35,10 @@ linters-settings:
 linters:
   enable:
     - bodyclose
+    - copyloopvar
     - depguard
     - dogsled
     - errcheck
-    - exportloopref
     - gci
     - gochecknoinits
     - gocognit

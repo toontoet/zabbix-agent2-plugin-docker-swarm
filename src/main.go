@@ -44,7 +44,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 SOFTWARE.
 `
 
-//nolint:gochecknoglobals,revive // required ALL_CAPS by build scripts
+//nolint:gochecknoglobals // required ALL_CAPS by build scripts
 var (
 	PLUGIN_VERSION_MAJOR = 1
 	PLUGIN_VERSION_MINOR = 0
