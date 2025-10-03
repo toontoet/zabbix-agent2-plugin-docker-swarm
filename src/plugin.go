@@ -436,12 +436,12 @@ func (p *swarmPlugin) findServiceByIdentifier(identifier string) (*Service, erro
 		if s.ID == identifier {
 			return &s, nil
 		}
-		
+
 		// Check if it's a service name
 		if s.Spec.Name == identifier {
 			return &s, nil
 		}
-		
+
 		// Check if it's a service key (stackname_servicename)
 		stackName := "standalone"
 		if s.Spec.Labels != nil {
