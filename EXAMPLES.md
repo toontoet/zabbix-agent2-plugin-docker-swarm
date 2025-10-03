@@ -68,16 +68,21 @@ Expected output:
 
 ### 4. Individual Service Metrics
 
-Get metrics for individual services:
+Get metrics for individual services using flexible identifiers:
+
+**Service Identifier Types:**
+- **Service Name**: `web`, `database` (simple and readable)
+- **Service Key**: `mystack_web`, `mystack_database` (stable across redeploys)
+- **Service ID**: `abc123def456...` (Docker's internal ID)
 
 ```bash
-# Get desired replica count
-zabbix_get -s localhost -k "swarm.service.replicas_desired[abc123def456]"
+# Get desired replica count (using service name)
+zabbix_get -s localhost -k "swarm.service.replicas_desired[web]"
 
-# Get running replica count  
-zabbix_get -s localhost -k "swarm.service.replicas_running[abc123def456]"
+# Get running replica count (using service key for stack service)
+zabbix_get -s localhost -k "swarm.service.replicas_running[mystack_web]"
 
-# Get restart count (crashed tasks)
+# Get restart count (using service ID - all methods work)
 zabbix_get -s localhost -k "swarm.service.restarts[abc123def456]"
 ```
 
@@ -244,9 +249,39 @@ zabbix_get -s localhost -k "swarm.service.restarts[$SERVICE_ID]"
 docker service update --entrypoint '["nginx","-g","daemon off;"]' teststack_web
 
 # In Zabbix, configure a trigger with:
-# Expression: change(/YourHost/swarm.service.restarts[{#SERVICE.ID}])>0
+# Expression: change(/YourHost/swarm.service.restarts[{#SERVICE.KEY}])>0
 # This will fire whenever the restart count increases
 ```
+
+### Scenario 5: Stable Service Monitoring Across Redeploys
+
+**Problem**: Service IDs change when you redeploy a stack, breaking Zabbix monitoring.
+
+**Solution**: Use service keys for stable monitoring:
+
+```bash
+# Before redeploy - check service discovery
+zabbix_get -s localhost -k "swarm.services.discovery"
+
+# Example output shows service keys:
+# [{"{#SERVICE.ID}":"abc123","{#SERVICE.NAME}":"web","{#STACK.NAME}":"mystack","{#SERVICE.KEY}":"mystack_web"}]
+
+# Monitor using stable service key (survives redeploys)
+zabbix_get -s localhost -k "swarm.service.replicas_running[mystack_web]"
+zabbix_get -s localhost -k "swarm.service.restarts[mystack_web]"
+
+# Redeploy the stack
+docker stack deploy -c docker-compose.yml mystack
+
+# Service ID changed, but service key remains the same!
+# Monitoring continues without interruption
+zabbix_get -s localhost -k "swarm.service.replicas_running[mystack_web]"
+```
+
+**Zabbix Template Configuration:**
+- Use `{#SERVICE.KEY}` instead of `{#SERVICE.ID}` in item keys
+- Service keys are stable across stack redeploys
+- Monitoring items won't disappear when services are updated
 
 ## Troubleshooting Examples
 

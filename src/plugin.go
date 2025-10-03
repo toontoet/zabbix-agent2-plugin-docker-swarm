@@ -21,7 +21,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"golang.zabbix.com/sdk/errs"
@@ -211,6 +210,8 @@ func (p *swarmPlugin) discoverServices(_ context.Context, params []string) (any,
 		ID        string `json:"{#SERVICE.ID}"`
 		Name      string `json:"{#SERVICE.NAME}"`
 		StackName string `json:"{#STACK.NAME}"`
+		// Add service name as primary identifier for stable monitoring
+		ServiceKey string `json:"{#SERVICE.KEY}"` // This will be the stable identifier
 	}
 
 	lldServices := make([]LLDService, 0, len(services))
@@ -222,10 +223,17 @@ func (p *swarmPlugin) discoverServices(_ context.Context, params []string) (any,
 			}
 		}
 
+		// Create stable service key: stackname_servicename or just servicename for standalone
+		serviceKey := s.Spec.Name
+		if stackName != "standalone" {
+			serviceKey = stackName + "_" + s.Spec.Name
+		}
+
 		lldServices = append(lldServices, LLDService{
-			ID:        s.ID,
-			Name:      s.Spec.Name,
-			StackName: stackName,
+			ID:         s.ID,
+			Name:       s.Spec.Name,
+			StackName:  stackName,
+			ServiceKey: serviceKey,
 		})
 	}
 
@@ -347,18 +355,15 @@ func (p *swarmPlugin) getDesiredReplicas(_ context.Context, params []string) (an
 		return nil, errs.New("expected 1 parameter for desired replicas")
 	}
 
-	serviceID := params[0]
-	body, err := p.client.Query(fmt.Sprintf("services/%s", serviceID), nil)
+	serviceIdentifier := params[0]
+
+	// Find the service by identifier (ID, name, or service key)
+	service, err := p.findServiceByIdentifier(serviceIdentifier)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	var service Service
-	if err = json.Unmarshal(body, &service); err != nil {
-		return nil, errs.Wrap(err, "cannot unmarshal JSON")
-	}
-
-	return p.getServiceDesiredReplicas(service)
+	return p.getServiceDesiredReplicas(*service)
 }
 
 func (p *swarmPlugin) getServiceDesiredReplicas(service Service) (int, error) {
@@ -382,8 +387,15 @@ func (p *swarmPlugin) getRunningTasks(_ context.Context, params []string) (any, 
 		return nil, errs.New("expected 1 parameter for running tasks")
 	}
 
-	serviceID := params[0]
-	return p.getServiceRunningTasks(serviceID)
+	serviceIdentifier := params[0]
+
+	// Find the service by identifier (ID, name, or service key)
+	service, err := p.findServiceByIdentifier(serviceIdentifier)
+	if err != nil {
+		return 0, err
+	}
+
+	return p.getServiceRunningTasks(service.ID)
 }
 
 func (p *swarmPlugin) getServiceRunningTasks(serviceID string) (int, error) {
@@ -412,16 +424,59 @@ func (p *swarmPlugin) getServiceRunningTasks(serviceID string) (int, error) {
 	return count, nil
 }
 
+// findServiceByIdentifier finds a service by ID, name, or service key
+func (p *swarmPlugin) findServiceByIdentifier(identifier string) (*Service, error) {
+	services, err := p.getServices()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range services {
+		// Check if it's a service ID
+		if s.ID == identifier {
+			return &s, nil
+		}
+		
+		// Check if it's a service name
+		if s.Spec.Name == identifier {
+			return &s, nil
+		}
+		
+		// Check if it's a service key (stackname_servicename)
+		stackName := "standalone"
+		if s.Spec.Labels != nil {
+			if namespace, exists := s.Spec.Labels["com.docker.stack.namespace"]; exists {
+				stackName = namespace
+			}
+		}
+		serviceKey := s.Spec.Name
+		if stackName != "standalone" {
+			serviceKey = stackName + "_" + s.Spec.Name
+		}
+		if serviceKey == identifier {
+			return &s, nil
+		}
+	}
+
+	return nil, errs.New("service not found: " + identifier)
+}
+
 func (p *swarmPlugin) getServiceRestarts(_ context.Context, params []string) (any, error) {
 	if len(params) != 1 {
 		return nil, errs.New("expected 1 parameter for service restarts")
 	}
 
-	serviceID := params[0]
+	serviceIdentifier := params[0]
+
+	// Find the service by identifier (ID, name, or service key)
+	targetService, err := p.findServiceByIdentifier(serviceIdentifier)
+	if err != nil {
+		return 0, err
+	}
 
 	// Get all tasks for the service (not just running ones)
 	filters := map[string][]string{
-		"service": {serviceID},
+		"service": {targetService.ID},
 	}
 
 	body, err := p.client.Query("tasks", filters)

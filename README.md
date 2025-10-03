@@ -108,8 +108,9 @@ zabbix_get -s localhost -k "swarm.stacks.discovery"
 # Test stack health (replace 'mystack' with actual stack name)
 zabbix_get -s localhost -k "swarm.stack.health[mystack]"
 
-# Test restart monitoring (replace 'service_id' with actual service ID)
-zabbix_get -s localhost -k "swarm.service.restarts[service_id]"
+# Test restart monitoring (use service name, ID, or service key)
+zabbix_get -s localhost -k "swarm.service.restarts[web]"
+zabbix_get -s localhost -k "swarm.service.restarts[mystack_web]"
 ```
 
 For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMPLES.md).
@@ -118,12 +119,29 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 
 | Key | Description | Returns |
 |-----|-------------|---------|
-| `swarm.services.discovery` | Service discovery for LLD | JSON array with `{#SERVICE.ID}`, `{#SERVICE.NAME}`, and `{#STACK.NAME}` macros |
-| `swarm.service.replicas_desired[<service_id>]` | Configured replica count | Integer (desired replicas) |
-| `swarm.service.replicas_running[<service_id>]` | Running task count | Integer (running tasks) |
-| `swarm.service.restarts[<service_id>]` | Number of task restarts (crashed tasks) | Integer (restart count) |
+| `swarm.services.discovery` | Service discovery for LLD | JSON array with `{#SERVICE.ID}`, `{#SERVICE.NAME}`, `{#STACK.NAME}`, and `{#SERVICE.KEY}` macros |
+| `swarm.service.replicas_desired[<service_identifier>]` | Configured replica count | Integer (desired replicas) |
+| `swarm.service.replicas_running[<service_identifier>]` | Running task count | Integer (running tasks) |
+| `swarm.service.restarts[<service_identifier>]` | Number of task restarts (crashed tasks) | Integer (restart count) |
 | `swarm.stacks.discovery` | Stack discovery for LLD | JSON array with `{#STACK.NAME}` macro |
 | `swarm.stack.health[<stack_name>]` | Stack health status | JSON with health metrics |
+
+### Service Identifiers
+
+Service metrics accept multiple identifier types for maximum flexibility:
+
+- **Service ID**: Full Docker service ID (e.g., `abc123def456...`)
+- **Service Name**: Simple service name (e.g., `web`, `database`)
+- **Service Key**: Stable identifier for stack services (e.g., `mystack_web`, `mystack_database`)
+
+**Service Key Format:**
+- **Stack services**: `{stack_name}_{service_name}` (e.g., `mystack_web`)
+- **Standalone services**: `{service_name}` (e.g., `web`)
+
+**Benefits:**
+- ✅ **Stable monitoring**: Service keys don't change during stack redeploys
+- ✅ **Flexible identification**: Use any identifier type that's convenient
+- ✅ **Backward compatible**: Existing service ID usage continues to work
 
 ## Zabbix Template Configuration
 
@@ -140,19 +158,19 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 1. **Desired Replicas**
 
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) desired replicas
-   - **Key**: `swarm.service.replicas_desired[{#SERVICE.ID}]`
+   - **Key**: `swarm.service.replicas_desired[{#SERVICE.KEY}]`
    - **Type**: Zabbix agent
 
 2. **Running Replicas**
 
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) running replicas
-   - **Key**: `swarm.service.replicas_running[{#SERVICE.ID}]`
+   - **Key**: `swarm.service.replicas_running[{#SERVICE.KEY}]`
    - **Type**: Zabbix agent
 
 3. **Restart Count**
 
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) restart count
-   - **Key**: `swarm.service.restarts[{#SERVICE.ID}]`
+   - **Key**: `swarm.service.restarts[{#SERVICE.KEY}]`
    - **Type**: Zabbix agent
    - **Store Value**: Delta (speed per second)
    - **Note**: Use Delta to track increase in restarts over time
@@ -162,13 +180,13 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 1. **Replica Mismatch**
 
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) replica mismatch
-   - **Expression**: `last(/Template/swarm.service.replicas_running[{#SERVICE.ID}])<>last(/Template/swarm.service.replicas_desired[{#SERVICE.ID}])`
+   - **Expression**: `last(/Template/swarm.service.replicas_running[{#SERVICE.KEY}])<>last(/Template/swarm.service.replicas_desired[{#SERVICE.KEY}])`
    - **Severity**: Warning
 
 2. **Service Restarted**
 
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) has restarted
-   - **Expression**: `change(/Template/swarm.service.restarts[{#SERVICE.ID}])>0`
+   - **Expression**: `change(/Template/swarm.service.restarts[{#SERVICE.KEY}])>0`
    - **Severity**: Warning
    - **Description**: A task for this service has crashed and been restarted
 
