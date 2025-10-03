@@ -28,6 +28,7 @@ The standard Docker plugin in Zabbix is inadequate for Docker Swarm monitoring b
 ### 1. Download or Build
 
 **Option A: Build from source**
+
 ```bash
 git clone <repository-url>
 cd zabbix-agent2-plugin-docker-swarm/src
@@ -38,44 +39,40 @@ make build-x86_64
 # For ARM64 Linux 
 make build-arm64
 
-# For both architectures
-make build-all
+# Or build both
+make build
 ```
 
 **Option B: Download pre-built binaries**
-Download the appropriate binary for your system architecture from the releases page.
+
+Download the latest release from the [Releases](https://github.com/your-username/zabbix-agent2-plugin-docker-swarm/releases) page.
 
 ### 2. Install Plugin
 
-Copy the binary to your Docker Swarm node:
-
 ```bash
-# For x86_64 systems (Intel/AMD):
+# Copy the binary to Zabbix plugins directory
 sudo cp docker-swarm-linux-x86_64 /var/lib/zabbix/plugins/docker-swarm
-
-# For ARM64 systems:
-sudo cp docker-swarm-linux-arm64 /var/lib/zabbix/plugins/docker-swarm
-
-# Set permissions:
 sudo chmod +x /var/lib/zabbix/plugins/docker-swarm
 sudo chown zabbix:zabbix /var/lib/zabbix/plugins/docker-swarm
 ```
 
 ### 3. Configure Zabbix Agent 2
 
-Add the plugin configuration to your Zabbix Agent 2 configuration file:
+Add to `/etc/zabbix/zabbix_agent2.conf`:
 
 ```ini
-# /etc/zabbix/zabbix_agent2.conf
 Plugins.DockerSwarm.System.Path=/var/lib/zabbix/plugins/docker-swarm
+Plugins.DockerSwarm.System.Timeout=30
 ```
 
-### 4. Set Docker Permissions
-
-Ensure the Zabbix user has access to the Docker socket:
+### 4. Configure Docker Socket Access
 
 ```bash
-sudo usermod -a -G docker zabbix
+# Add zabbix user to docker group
+sudo usermod -aG docker zabbix
+
+# Or set proper permissions on socket
+sudo chmod 666 /var/run/docker.sock
 ```
 
 ### 5. Restart Services
@@ -128,22 +125,27 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 ### Service-Level Monitoring
 
 #### Discovery Rule
+
 - **Name**: Docker Swarm Services
 - **Key**: `swarm.services.discovery`
 - **Update Interval**: 300s (5 minutes)
 
 #### Item Prototypes
+
 1. **Desired Replicas**
+
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) desired replicas
    - **Key**: `swarm.service.replicas_desired[{#SERVICE.ID}]`
    - **Type**: Zabbix agent
 
 2. **Running Replicas**
+
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) running replicas
    - **Key**: `swarm.service.replicas_running[{#SERVICE.ID}]`
    - **Type**: Zabbix agent
 
 3. **Restart Count**
+
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) restart count
    - **Key**: `swarm.service.restarts[{#SERVICE.ID}]`
    - **Type**: Zabbix agent
@@ -151,12 +153,15 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
    - **Note**: Use Delta to track increase in restarts over time
 
 #### Trigger Prototypes
+
 1. **Replica Mismatch**
+
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) replica mismatch
    - **Expression**: `last(/Template/swarm.service.replicas_running[{#SERVICE.ID}])<>last(/Template/swarm.service.replicas_desired[{#SERVICE.ID}])`
    - **Severity**: Warning
 
 2. **Service Restarted**
+
    - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) has restarted
    - **Expression**: `change(/Template/swarm.service.restarts[{#SERVICE.ID}])>0`
    - **Severity**: Warning
@@ -165,231 +170,99 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 ### Stack-Level Monitoring
 
 #### Discovery Rule
+
 - **Name**: Docker Compose Stacks
 - **Key**: `swarm.stacks.discovery`
 - **Update Interval**: 600s (10 minutes)
 
 #### Item Prototypes
+
 1. **Stack Health**
+
    - **Name**: Stack {#STACK.NAME} health status
    - **Key**: `swarm.stack.health[{#STACK.NAME}]`
    - **Type**: Zabbix agent
    - **Value Type**: Text
 
 2. **Stack Health Percentage** (Calculated Item)
+
    - **Name**: Stack {#STACK.NAME} health percentage
    - **Formula**: `jsonpath(last(/Template/swarm.stack.health[{#STACK.NAME}]),"$.health_percentage")`
    - **Units**: %
 
 3. **Unhealthy Services Count** (Calculated Item)
+
    - **Name**: Stack {#STACK.NAME} unhealthy services
    - **Formula**: `jsonpath(last(/Template/swarm.stack.health[{#STACK.NAME}]),"$.unhealthy_services")`
 
 #### Trigger Prototypes
+
 1. **Stack Health Critical**
+
    - **Name**: Stack {#STACK.NAME} has unhealthy services
    - **Expression**: `jsonpath(last(/Template/swarm.stack.health[{#STACK.NAME}]),"$.unhealthy_services")>0`
    - **Severity**: High
 
 2. **Stack Health Warning**
+
    - **Name**: Stack {#STACK.NAME} health below 100%
    - **Expression**: `jsonpath(last(/Template/swarm.stack.health[{#STACK.NAME}]),"$.health_percentage")<100`
    - **Severity**: Warning
 
-## Architecture Support
-
-This plugin supports the following architectures:
-
-- **x86_64/AMD64**: Intel and AMD processors (most common)
-- **ARM64/aarch64**: ARM processors (including Apple Silicon via cross-compilation)
-
-Use `uname -m` to determine your system architecture.
-
-## Example Outputs
+## How It Works
 
 ### Service Discovery
-```json
-[
-  {
-    "{#SERVICE.ID}": "abc123def456",
-    "{#SERVICE.NAME}": "web-frontend",
-    "{#STACK.NAME}": "myapp"
-  },
-  {
-    "{#SERVICE.ID}": "def456ghi789",
-    "{#SERVICE.NAME}": "api-backend", 
-    "{#STACK.NAME}": "myapp"
-  },
-  {
-    "{#SERVICE.ID}": "ghi789jkl012",
-    "{#SERVICE.NAME}": "nginx-proxy",
-    "{#STACK.NAME}": "standalone"
-  }
-]
-```
 
-### Stack Discovery
-```json
-[
-  {
-    "{#STACK.NAME}": "myapp"
-  },
-  {
-    "{#STACK.NAME}": "monitoring"
-  },
-  {
-    "{#STACK.NAME}": "standalone"
-  }
-]
-```
+The plugin discovers all Docker Swarm services and groups them by Docker Compose stack using the `com.docker.stack.namespace` label. Services without this label are marked as "standalone".
 
-### Stack Health
-```json
-{
-  "total_services": 5,
-  "healthy_services": 4,
-  "unhealthy_services": 1,
-  "health_percentage": 80.0
-}
-```
+### Stack Health Calculation
 
-## Development
+For each stack, the plugin:
 
-### Building
-```bash
-# Install dependencies
-make deps
+1. Identifies all services belonging to the stack
+2. Compares desired vs running replica counts for each service
+3. Calculates health percentage: `(healthy_services / total_services) * 100`
+4. Returns comprehensive health metrics
 
-# Check code quality
-make check
+### Restart Detection
 
-# Build for production
-make build-all
-
-# Clean build artifacts
-make clean
-```
-
-### GitHub Actions Workflows
-
-This project includes several automated workflows:
-
-- **🔄 CI (Continuous Integration)**: Runs on every push and PR
-  - Code formatting checks (`go fmt`)
-  - Linting with `golangci-lint`
-  - Security scanning with `gosec`
-  - Cross-platform builds (x86_64 and ARM64)
-
-- **🚀 Release**: Triggered by version tags (e.g., `v1.0.0`)
-  - Builds binaries for both architectures
-  - Creates GitHub releases with download links
-  - Includes checksums and complete packages
-  - Auto-generates release notes
-
-- **📚 Documentation**: Validates documentation
-  - Markdown linting
-  - Link checking
-  - Metric consistency validation
-
-### Creating a Release
-
-To create a new release:
-
-1. **Update version** in `src/main.go`:
-   ```go
-   PLUGIN_VERSION_MAJOR = 1
-   PLUGIN_VERSION_MINOR = 1
-   PLUGIN_VERSION_PATCH = 0
-   PLUGIN_VERSION_RC    = ""  // Remove "alpha1" for stable release
-   ```
-
-2. **Commit changes**:
-   ```bash
-   git add .
-   git commit -m "Release v1.1.0"
-   git push origin main
-   ```
-
-3. **Create and push tag**:
-   ```bash
-   git tag v1.1.0
-   git push origin v1.1.0
-   ```
-
-4. **Automatic release**: GitHub Actions will automatically:
-   - Build binaries for x86_64 and ARM64
-   - Create a GitHub release
-   - Upload binaries and packages
-   - Generate release notes
-
-### Download URLs
-
-After release, binaries will be available at:
-- **x86_64**: `https://github.com/owner/repo/releases/download/v1.1.0/docker-swarm-linux-amd64`
-- **ARM64**: `https://github.com/owner/repo/releases/download/v1.1.0/docker-swarm-linux-arm64`
-
-### Project Structure
-```
-zabbix-agent2-plugin-docker-swarm/
-├── README.md         # This file
-├── LICENSE          # MIT License
-└── src/             # Source code directory
-    ├── main.go      # Entry point and version handling
-    ├── plugin.go    # Core plugin logic and metric handlers
-    ├── client.go    # Docker API client
-    ├── types.go     # Docker API data structures
-    ├── go.mod       # Go module dependencies
-    ├── Makefile     # Build automation
-    ├── swarm.conf   # Configuration example
-    └── .gitignore   # Git ignore rules
-```
+The plugin tracks tasks that have failed or shutdown with non-zero exit codes, indicating container crashes that triggered Docker Swarm restarts.
 
 ## Troubleshooting
 
-### Architecture Mismatch
-**Error**: `exec format error`
-**Solution**: Use the correct binary for your system architecture (x86_64 vs ARM64).
+### Common Issues
 
-### Permission Denied
-**Error**: Plugin cannot access Docker socket
-**Solution**: Ensure `zabbix` user is in the `docker` group and restart zabbix-agent2.
+1. **Permission Denied**: Ensure Zabbix user has access to Docker socket
+2. **No Services Found**: Verify Docker Swarm is running and services exist
+3. **Stack Not Detected**: Check that services have `com.docker.stack.namespace` labels
 
-### Plugin Not Loading
-**Error**: Plugin not found or fails to load
-**Solution**: 
-1. Verify the binary path in `zabbix_agent2.conf`
-2. Check binary permissions and ownership
-3. Review Zabbix Agent 2 logs for detailed error messages
+### Debug Commands
 
-### No Services Discovered
-**Error**: Empty discovery results
-**Solution**:
-1. Verify Docker Swarm is running (`docker node ls`)
-2. Ensure services exist (`docker service ls`)
-3. Check Docker socket accessibility
+```bash
+# Test Docker API access
+curl --unix-socket /var/run/docker.sock http://localhost/v1.41/services
 
-### Stack Name Shows "standalone"
-**Info**: Services not created with `docker stack deploy` will show `{#STACK.NAME}` as "standalone"
-**Note**: This is expected behavior for services created with `docker service create` or similar commands
+# Check Zabbix Agent logs
+sudo tail -f /var/log/zabbix/zabbix_agent2.log
 
-### Stack Health Returns Error
-**Error**: "stack not found" when querying `swarm.stack.health[<stack_name>]`
-**Solution**:
-1. Verify the stack name exists in `swarm.stacks.discovery` output
-2. Check that services in the stack have the `com.docker.stack.namespace` label
-3. Ensure the stack name is spelled correctly (case-sensitive)
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+# Test specific metrics
+zabbix_get -s localhost -k "swarm.services.discovery"
+```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-## Support
+## License
 
-For issues and questions:
-1. Check the troubleshooting section above
-2. Review Zabbix Agent 2 logs
-3. Open an issue on the project repository
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Zabbix team for the excellent Agent 2 plugin framework
+- Docker team for the comprehensive Swarm API
+- Community contributors and testers
