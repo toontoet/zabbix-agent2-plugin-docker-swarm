@@ -4,7 +4,11 @@ A production-ready loadable plugin for Zabbix Agent 2 that provides comprehensiv
 
 ## Overview
 
-The standard Docker plugin in Zabbix is inadequate for Docker Swarm monitoring because containers get random suffixes when restarted, creating new Zabbix items and breaking historical data continuity. This plugin solves this by monitoring at the **service level** instead of container level, providing stable service discovery and tracking desired vs running replica counts.
+The standard Docker plugin in Zabbix is inadequate for 
+Docker Swarm monitoring because containers get random suffixes 
+when restarted, creating new Zabbix items and breaking historical data continuity. 
+This plugin solves this by monitoring at the **service level** instead of container level, 
+providing stable service discovery and tracking desired vs running replica counts.
 
 ## Features
 
@@ -45,7 +49,8 @@ make build
 
 **Option B: Download pre-built binaries**
 
-Download the latest release from the [Releases](https://github.com/your-username/zabbix-agent2-plugin-docker-swarm/releases) page.
+Download the latest release from the 
+  [Releases](https://github.com/your-username/zabbix-agent2-plugin-docker-swarm/releases) page.
 
 ### 2. Install Plugin
 
@@ -113,7 +118,8 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 
 | Key | Description | Returns |
 |-----|-------------|---------|
-| `swarm.services.discovery` | Service discovery for LLD | JSON array with `{#SERVICE.ID}`, `{#SERVICE.NAME}`, and `{#STACK.NAME}` macros |
+| `swarm.services.discovery` | Service discovery for LLD | JSON array with 
+  `{#SERVICE.ID}`, `{#SERVICE.NAME}`, and `{#STACK.NAME}` macros |
 | `swarm.service.replicas_desired[<service_id>]` | Configured replica count | Integer (desired replicas) |
 | `swarm.service.replicas_running[<service_id>]` | Running task count | Integer (running tasks) |
 | `swarm.service.restarts[<service_id>]` | Number of task restarts (crashed tasks) | Integer (restart count) |
@@ -213,7 +219,9 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 
 ### Service Discovery
 
-The plugin discovers all Docker Swarm services and groups them by Docker Compose stack using the `com.docker.stack.namespace` label. Services without this label are marked as "standalone".
+The plugin discovers all Docker Swarm services and groups them by Docker 
+Compose stack using the `com.docker.stack.namespace` label. Services 
+without this label are marked as "standalone".
 
 ### Stack Health Calculation
 
@@ -226,7 +234,8 @@ For each stack, the plugin:
 
 ### Restart Detection
 
-The plugin tracks tasks that have failed or shutdown with non-zero exit codes, indicating container crashes that triggered Docker Swarm restarts.
+The plugin tracks tasks that have failed or shutdown with non-zero exit codes, 
+indicating container crashes that triggered Docker Swarm restarts.
 
 ## Troubleshooting
 
