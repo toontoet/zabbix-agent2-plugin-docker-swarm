@@ -111,6 +111,12 @@ zabbix_get -s localhost -k "swarm.stack.health[mystack]"
 # Test restart monitoring (use service name, ID, or service key)
 zabbix_get -s localhost -k "swarm.service.restarts[web]"
 zabbix_get -s localhost -k "swarm.service.restarts[mystack_web]"
+
+# Debug: Check total task count to understand restart behavior
+zabbix_get -s localhost -k "swarm.service.tasks[web]"
+
+# Check last restart timestamp (for restart detection)
+zabbix_get -s localhost -k "swarm.service.last_restart[web]"
 ```
 
 For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMPLES.md).
@@ -123,6 +129,8 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 | `swarm.service.replicas_desired[<service_identifier>]` | Configured replica count | Integer (desired replicas) |
 | `swarm.service.replicas_running[<service_identifier>]` | Running task count | Integer (running tasks) |
 | `swarm.service.restarts[<service_identifier>]` | Number of task restarts (crashed tasks) | Integer (restart count) |
+| `swarm.service.tasks[<service_identifier>]` | Total number of tasks for debugging | Integer (task count) |
+| `swarm.service.last_restart[<service_identifier>]` | Timestamp of most recent running task | Unix timestamp |
 | `swarm.stacks.discovery` | Stack discovery for LLD | JSON array with `{#STACK.NAME}` macro |
 | `swarm.stack.health[<stack_name>]` | Stack health status | JSON with health metrics |
 
@@ -142,6 +150,26 @@ Service metrics accept multiple identifier types for maximum flexibility:
 - ✅ **Stable monitoring**: Service keys don't change during stack redeploys
 - ✅ **Flexible identification**: Use any identifier type that's convenient
 - ✅ **Backward compatible**: Existing service ID usage continues to work
+
+### Restart Detection Methods
+
+The plugin provides multiple ways to detect service restarts:
+
+1. **Task Count Method** (`swarm.service.restarts`):
+   - Counts non-running tasks in recent history
+   - Limited by Docker's ~5 task retention policy
+   - Good for detecting recent restarts
+
+2. **Timestamp Method** (`swarm.service.last_restart`):
+   - Returns Unix timestamp of most recent running task
+   - Use in Zabbix with `change()` function to detect restarts
+   - More reliable for long-term monitoring
+
+**Recommended Zabbix Trigger:**
+```
+Expression: change(/YourHost/swarm.service.last_restart[{#SERVICE.KEY}])>0
+Description: Service {#SERVICE.NAME} has restarted
+```
 
 ## Zabbix Template Configuration
 

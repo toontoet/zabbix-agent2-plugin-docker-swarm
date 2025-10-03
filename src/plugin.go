@@ -37,6 +37,8 @@ const (
 	serviceReplicasDesired = swarmMetricKey("swarm.service.replicas_desired")
 	serviceReplicasRunning = swarmMetricKey("swarm.service.replicas_running")
 	serviceRestartCount    = swarmMetricKey("swarm.service.restarts")
+	serviceTaskCount       = swarmMetricKey("swarm.service.tasks")
+	serviceLastRestart     = swarmMetricKey("swarm.service.last_restart")
 	stackDiscoveryMetric   = swarmMetricKey("swarm.stacks.discovery")
 	stackHealthMetric      = swarmMetricKey("swarm.stack.health")
 )
@@ -149,6 +151,22 @@ func (p *swarmPlugin) registerMetrics() error {
 				false,
 			),
 			handler: p.getServiceRestarts,
+		},
+		serviceTaskCount: {
+			metric: metric.New(
+				"Returns the total number of tasks for a service (for debugging).",
+				nil,
+				false,
+			),
+			handler: p.getServiceTaskCount,
+		},
+		serviceLastRestart: {
+			metric: metric.New(
+				"Returns the timestamp of the most recent running task (for restart detection).",
+				nil,
+				false,
+			),
+			handler: p.getServiceLastRestart,
 		},
 		stackDiscoveryMetric: {
 			metric: metric.New(
@@ -489,18 +507,99 @@ func (p *swarmPlugin) getServiceRestarts(_ context.Context, params []string) (an
 		return 0, errs.Wrap(err, "cannot unmarshal JSON")
 	}
 
-	// Count tasks that have failed/shutdown state with exit code != 0
-	// This indicates the container crashed and was restarted
+	// Count restarts by looking at task creation timestamps
+	// Since Docker Swarm only keeps ~5 recent tasks, we need a different approach
+	// We'll count tasks that are not currently running as restarts
+	// This gives us the restart count within the recent task history window
+
 	restartCount := 0
+
+	// Count all tasks that are not currently running
+	// This includes failed, shutdown, and completed tasks
 	for _, task := range tasks {
-		// Count tasks that were shutdown/failed with non-zero exit code
-		// These indicate restarts due to crashes
-		if task.Status.State == "failed" || task.Status.State == "shutdown" {
-			if task.Status.ContainerStatus != nil && task.Status.ContainerStatus.ExitCode != 0 {
-				restartCount++
-			}
+		// Count all tasks that are not currently running
+		// This includes all historical tasks (restarts)
+		if task.Status.State != "running" {
+			restartCount++
 		}
 	}
 
 	return restartCount, nil
+}
+
+func (p *swarmPlugin) getServiceTaskCount(_ context.Context, params []string) (any, error) {
+	if len(params) != 1 {
+		return nil, errs.New("expected 1 parameter for service task count")
+	}
+
+	serviceIdentifier := params[0]
+
+	// Find the service by identifier (ID, name, or service key)
+	targetService, err := p.findServiceByIdentifier(serviceIdentifier)
+	if err != nil {
+		return 0, err
+	}
+
+	// Get all tasks for the service (not just running ones)
+	filters := map[string][]string{
+		"service": {targetService.ID},
+	}
+
+	body, err := p.client.Query("tasks", filters)
+	if err != nil {
+		return 0, err
+	}
+
+	var tasks []Task
+	if err = json.Unmarshal(body, &tasks); err != nil {
+		return 0, errs.Wrap(err, "cannot unmarshal JSON")
+	}
+
+	// Return total task count for debugging
+	return len(tasks), nil
+}
+
+func (p *swarmPlugin) getServiceLastRestart(_ context.Context, params []string) (any, error) {
+	if len(params) != 1 {
+		return nil, errs.New("expected 1 parameter for service last restart")
+	}
+
+	serviceIdentifier := params[0]
+
+	// Find the service by identifier (ID, name, or service key)
+	targetService, err := p.findServiceByIdentifier(serviceIdentifier)
+	if err != nil {
+		return 0, err
+	}
+
+	// Get all tasks for the service (not just running ones)
+	filters := map[string][]string{
+		"service": {targetService.ID},
+	}
+
+	body, err := p.client.Query("tasks", filters)
+	if err != nil {
+		return 0, err
+	}
+
+	var tasks []Task
+	if err = json.Unmarshal(body, &tasks); err != nil {
+		return 0, errs.Wrap(err, "cannot unmarshal JSON")
+	}
+
+	// Find the most recent running task and return its timestamp
+	var mostRecentTimestamp int64 = 0
+
+	for _, task := range tasks {
+		if task.Status.State == "running" && task.Status.Timestamp != "" {
+			// Parse the timestamp (Docker uses RFC3339 format)
+			if timestamp, err := time.Parse(time.RFC3339, task.Status.Timestamp); err == nil {
+				if timestamp.Unix() > mostRecentTimestamp {
+					mostRecentTimestamp = timestamp.Unix()
+				}
+			}
+		}
+	}
+
+	return mostRecentTimestamp, nil
 }
