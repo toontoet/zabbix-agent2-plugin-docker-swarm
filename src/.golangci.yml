@@ -12,10 +12,9 @@ linters-settings:
     simplify: true
   goimports:
     local-prefixes: golang.zabbix.com
-  golint:
-    min-confidence: 0
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   misspell:
     locale: US
   revive:
@@ -28,7 +27,6 @@ linters-settings:
 linters:
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
     - errcheck
@@ -40,7 +38,6 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - golint
     - goprintffuncname
     - gosec
     - gosimple
@@ -50,12 +47,10 @@ linters:
     - nolintlint
     - revive
     - staticcheck
-    - structcheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
 
   disable:

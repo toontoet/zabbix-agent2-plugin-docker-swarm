@@ -5,6 +5,7 @@ This document provides practical examples of how to use the Docker Swarm plugin 
 ## Testing the Plugin
 
 ### 1. Service Discovery
+
 Test basic service discovery to see all services with their stack information:
 
 ```bash
@@ -12,6 +13,7 @@ zabbix_get -s localhost -k "swarm.services.discovery"
 ```
 
 Expected output (formatted for readability):
+
 ```json
 [
   {
@@ -28,6 +30,7 @@ Expected output (formatted for readability):
 ```
 
 ### 2. Stack Discovery
+
 Discover all Docker Compose stacks:
 
 ```bash
@@ -35,6 +38,7 @@ zabbix_get -s localhost -k "swarm.stacks.discovery"
 ```
 
 Expected output:
+
 ```json
 [
   {"{#STACK.NAME}": "myapp"},
@@ -44,6 +48,7 @@ Expected output:
 ```
 
 ### 3. Stack Health Monitoring
+
 Get health status for a specific stack:
 
 ```bash
@@ -51,6 +56,7 @@ zabbix_get -s localhost -k "swarm.stack.health[myapp]"
 ```
 
 Expected output:
+
 ```json
 {
   "total_services": 3,
@@ -61,6 +67,7 @@ Expected output:
 ```
 
 ### 4. Individual Service Metrics
+
 Get metrics for individual services:
 
 ```bash
@@ -79,6 +86,7 @@ zabbix_get -s localhost -k "swarm.service.restarts[abc123def456]"
 To test stack functionality, create a simple Docker Compose stack:
 
 ### docker-compose.yml
+
 ```yaml
 version: '3.8'
 services:
@@ -104,6 +112,7 @@ services:
 ```
 
 ### Deploy the Stack
+
 ```bash
 # Deploy the stack
 docker stack deploy -c docker-compose.yml teststack
