@@ -219,6 +219,7 @@ zabbix_get -s localhost -k "swarm.services.discovery"
 ```
 
 ### Scenario 4: Monitor Service Restarts
+
 Test restart detection when a service crashes:
 
 ```bash
@@ -250,6 +251,7 @@ docker service update --entrypoint '["nginx","-g","daemon off;"]' teststack_web
 ## Troubleshooting Examples
 
 ### Debug Stack Labels
+
 If services don't appear in the correct stack, check their labels:
 
 ```bash
@@ -260,6 +262,7 @@ docker service inspect teststack_web --format '{{json .Spec.Labels}}'
 ```
 
 ### Verify Plugin Installation
+
 ```bash
 # Test basic connectivity
 zabbix_get -s localhost -k "agent.ping"
@@ -271,4 +274,4 @@ zabbix_get -s localhost -k "swarm.services.discovery"
 sudo tail -f /var/log/zabbix/zabbix_agent2.log
 ```
 
-This should give you a comprehensive foundation for testing and implementing the Docker Swarm plugin with stack monitoring capabilities. 
+This should give you a comprehensive foundation for testing and implementing the Docker Swarm plugin with stack monitoring capabilities.

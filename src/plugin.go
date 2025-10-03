@@ -28,7 +28,6 @@ import (
 	"golang.zabbix.com/sdk/metric"
 	"golang.zabbix.com/sdk/plugin"
 	"golang.zabbix.com/sdk/plugin/container"
-	"golang.zabbix.com/sdk/zbxerr"
 )
 
 const (
@@ -101,7 +100,7 @@ func (p *swarmPlugin) Stop() {
 func (p *swarmPlugin) Export(key string, rawParams []string, _ plugin.ContextProvider) (any, error) {
 	m, ok := p.metrics[swarmMetricKey(key)]
 	if !ok {
-		return nil, errs.Wrapf(zbxerr.ErrorUnsupportedMetric, "unknown metric %q", key)
+		return nil, errs.New("unknown metric " + key)
 	}
 
 	ctx, cancel := context.WithTimeout(
@@ -192,7 +191,7 @@ func (p *swarmPlugin) getServices() ([]Service, error) {
 
 	var services []Service
 	if err = json.Unmarshal(body, &services); err != nil {
-		return nil, zbxerr.ErrorCannotUnmarshalJSON.Wrap(err)
+		return nil, errs.Wrap(err, "cannot unmarshal JSON")
 	}
 
 	return services, nil
@@ -200,7 +199,7 @@ func (p *swarmPlugin) getServices() ([]Service, error) {
 
 func (p *swarmPlugin) discoverServices(_ context.Context, params []string) (any, error) {
 	if len(params) != 0 {
-		return nil, zbxerr.ErrorInvalidParams.Wrap(fmt.Errorf("expected no parameters for service discovery"))
+		return nil, errs.New("expected no parameters for service discovery")
 	}
 
 	services, err := p.getServices()
@@ -232,7 +231,7 @@ func (p *swarmPlugin) discoverServices(_ context.Context, params []string) (any,
 
 	jsonData, err := json.Marshal(lldServices)
 	if err != nil {
-		return nil, zbxerr.ErrorCannotMarshalJSON.Wrap(err)
+		return nil, errs.Wrap(err, "cannot marshal JSON")
 	}
 
 	return string(jsonData), nil
@@ -240,7 +239,7 @@ func (p *swarmPlugin) discoverServices(_ context.Context, params []string) (any,
 
 func (p *swarmPlugin) discoverStacks(_ context.Context, params []string) (any, error) {
 	if len(params) != 0 {
-		return nil, zbxerr.ErrorInvalidParams.Wrap(fmt.Errorf("expected no parameters for stack discovery"))
+		return nil, errs.New("expected no parameters for stack discovery")
 	}
 
 	services, err := p.getServices()
@@ -270,7 +269,7 @@ func (p *swarmPlugin) discoverStacks(_ context.Context, params []string) (any, e
 
 	jsonData, err := json.Marshal(lldStacks)
 	if err != nil {
-		return nil, zbxerr.ErrorCannotMarshalJSON.Wrap(err)
+		return nil, errs.Wrap(err, "cannot marshal JSON")
 	}
 
 	return string(jsonData), nil
@@ -278,7 +277,7 @@ func (p *swarmPlugin) discoverStacks(_ context.Context, params []string) (any, e
 
 func (p *swarmPlugin) getStackHealth(_ context.Context, params []string) (any, error) {
 	if len(params) != 1 {
-		return nil, zbxerr.ErrorInvalidParams.Wrap(fmt.Errorf("expected 1 parameter for stack health"))
+		return nil, errs.New("expected 1 parameter for stack health")
 	}
 
 	stackName := params[0]
@@ -302,7 +301,7 @@ func (p *swarmPlugin) getStackHealth(_ context.Context, params []string) (any, e
 	}
 
 	if len(stackServices) == 0 {
-		return nil, zbxerr.New("stack not found: " + stackName)
+		return nil, errs.New("stack not found: " + stackName)
 	}
 
 	totalServices := len(stackServices)
@@ -310,13 +309,13 @@ func (p *swarmPlugin) getStackHealth(_ context.Context, params []string) (any, e
 
 	// Check health of each service
 	for _, service := range stackServices {
-		desired, err := p.getServiceDesiredReplicas(service)
-		if err != nil {
+		desired, dErr := p.getServiceDesiredReplicas(service)
+		if dErr != nil {
 			continue // Skip services we can't evaluate
 		}
 
-		running, err := p.getServiceRunningTasks(service.ID)
-		if err != nil {
+		running, rErr := p.getServiceRunningTasks(service.ID)
+		if rErr != nil {
 			continue // Skip services we can't evaluate
 		}
 
@@ -337,7 +336,7 @@ func (p *swarmPlugin) getStackHealth(_ context.Context, params []string) (any, e
 
 	jsonData, err := json.Marshal(result)
 	if err != nil {
-		return nil, zbxerr.ErrorCannotMarshalJSON.Wrap(err)
+		return nil, errs.Wrap(err, "cannot marshal JSON")
 	}
 
 	return string(jsonData), nil
@@ -345,7 +344,7 @@ func (p *swarmPlugin) getStackHealth(_ context.Context, params []string) (any, e
 
 func (p *swarmPlugin) getDesiredReplicas(_ context.Context, params []string) (any, error) {
 	if len(params) != 1 {
-		return nil, zbxerr.ErrorInvalidParams.Wrap(fmt.Errorf("expected 1 parameter for desired replicas"))
+		return nil, errs.New("expected 1 parameter for desired replicas")
 	}
 
 	serviceID := params[0]
@@ -356,7 +355,7 @@ func (p *swarmPlugin) getDesiredReplicas(_ context.Context, params []string) (an
 
 	var service Service
 	if err = json.Unmarshal(body, &service); err != nil {
-		return nil, zbxerr.ErrorCannotUnmarshalJSON.Wrap(err)
+		return nil, errs.Wrap(err, "cannot unmarshal JSON")
 	}
 
 	return p.getServiceDesiredReplicas(service)
@@ -375,12 +374,12 @@ func (p *swarmPlugin) getServiceDesiredReplicas(service Service) (int, error) {
 		return 1, nil
 	}
 
-	return 0, zbxerr.New("could not determine desired replicas for service " + service.ID)
+	return 0, errs.New("could not determine desired replicas for service " + service.ID)
 }
 
 func (p *swarmPlugin) getRunningTasks(_ context.Context, params []string) (any, error) {
 	if len(params) != 1 {
-		return nil, zbxerr.ErrorInvalidParams.Wrap(fmt.Errorf("expected 1 parameter for running tasks"))
+		return nil, errs.New("expected 1 parameter for running tasks")
 	}
 
 	serviceID := params[0]
@@ -400,7 +399,7 @@ func (p *swarmPlugin) getServiceRunningTasks(serviceID string) (int, error) {
 
 	var tasks []Task
 	if err = json.Unmarshal(body, &tasks); err != nil {
-		return 0, zbxerr.ErrorCannotUnmarshalJSON.Wrap(err)
+		return 0, errs.Wrap(err, "cannot unmarshal JSON")
 	}
 
 	count := 0
@@ -415,7 +414,7 @@ func (p *swarmPlugin) getServiceRunningTasks(serviceID string) (int, error) {
 
 func (p *swarmPlugin) getServiceRestarts(_ context.Context, params []string) (any, error) {
 	if len(params) != 1 {
-		return nil, zbxerr.ErrorInvalidParams.Wrap(fmt.Errorf("expected 1 parameter for service restarts"))
+		return nil, errs.New("expected 1 parameter for service restarts")
 	}
 
 	serviceID := params[0]
@@ -432,7 +431,7 @@ func (p *swarmPlugin) getServiceRestarts(_ context.Context, params []string) (an
 
 	var tasks []Task
 	if err = json.Unmarshal(body, &tasks); err != nil {
-		return 0, zbxerr.ErrorCannotUnmarshalJSON.Wrap(err)
+		return 0, errs.Wrap(err, "cannot unmarshal JSON")
 	}
 
 	// Count tasks that have failed/shutdown state with exit code != 0

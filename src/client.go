@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"golang.zabbix.com/sdk/zbxerr"
+	"golang.zabbix.com/sdk/errs"
 )
 
 const dockerAPIVersion = "v1.41"
@@ -43,7 +43,7 @@ func (cli *client) Query(path string, filters map[string][]string) ([]byte, erro
 	if filters != nil {
 		filterJSON, err := json.Marshal(filters)
 		if err != nil {
-			return nil, zbxerr.ErrorCannotMarshalJSON.Wrap(err)
+			return nil, errs.Wrap(err, "cannot marshal JSON")
 		}
 		q := u.Query()
 		q.Set("filters", string(filterJSON))
@@ -52,22 +52,22 @@ func (cli *client) Query(path string, filters map[string][]string) ([]byte, erro
 
 	resp, err := cli.client.Get(u.String())
 	if err != nil {
-		return nil, zbxerr.ErrorCannotFetchData.Wrap(err)
+		return nil, errs.Wrap(err, "cannot fetch data")
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, zbxerr.ErrorCannotFetchData.Wrap(err)
+		return nil, errs.Wrap(err, "cannot fetch data")
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		var apiErr ErrorMessage
 		if err = json.Unmarshal(body, &apiErr); err != nil {
 			// If we can't parse the error, return the raw body.
-			return nil, zbxerr.New(string(body))
+			return nil, errs.New(string(body))
 		}
-		return nil, zbxerr.New(apiErr.Message)
+		return nil, errs.New(apiErr.Message)
 	}
 
 	return body, nil
