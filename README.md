@@ -50,7 +50,7 @@ make build
 **Option B: Download pre-built binaries**
 
 Download the latest release from the 
-  [Releases](https://github.com/your-username/zabbix-agent2-plugin-docker-swarm/releases) page.
+  [Releases](https://github.com/toontoet/zabbix-agent2-plugin-docker-swarm/releases) page.
 
 ### 2. Install Plugin
 
@@ -118,8 +118,7 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 
 | Key | Description | Returns |
 |-----|-------------|---------|
-| `swarm.services.discovery` | Service discovery for LLD | JSON array with 
-  `{#SERVICE.ID}`, `{#SERVICE.NAME}`, and `{#STACK.NAME}` macros |
+| `swarm.services.discovery` | Service discovery for LLD | JSON array with `{#SERVICE.ID}`, `{#SERVICE.NAME}`, and `{#STACK.NAME}` macros |
 | `swarm.service.replicas_desired[<service_id>]` | Configured replica count | Integer (desired replicas) |
 | `swarm.service.replicas_running[<service_id>]` | Running task count | Integer (running tasks) |
 | `swarm.service.restarts[<service_id>]` | Number of task restarts (crashed tasks) | Integer (restart count) |
