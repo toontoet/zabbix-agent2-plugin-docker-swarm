@@ -38,6 +38,7 @@ const (
 	serviceDiscoveryMetric = swarmMetricKey("swarm.services.discovery")
 	serviceReplicasDesired = swarmMetricKey("swarm.service.replicas_desired")
 	serviceReplicasRunning = swarmMetricKey("swarm.service.replicas_running")
+	serviceRestartCount    = swarmMetricKey("swarm.service.restarts")
 	stackDiscoveryMetric   = swarmMetricKey("swarm.stacks.discovery")
 	stackHealthMetric      = swarmMetricKey("swarm.stack.health")
 )
@@ -142,6 +143,14 @@ func (p *swarmPlugin) registerMetrics() error {
 				false,
 			),
 			handler: p.getRunningTasks,
+		},
+		serviceRestartCount: {
+			metric: metric.New(
+				"Returns the number of task restarts for a service.",
+				nil,
+				false,
+			),
+			handler: p.getServiceRestarts,
 		},
 		stackDiscoveryMetric: {
 			metric: metric.New(
@@ -400,4 +409,42 @@ func (p *swarmPlugin) getServiceRunningTasks(serviceID string) (int, error) {
 	}
 
 	return count, nil
+}
+
+func (p *swarmPlugin) getServiceRestarts(_ context.Context, params []string) (any, error) {
+	if len(params) != 1 {
+		return nil, zbxerr.ErrorInvalidParams.Wrap(fmt.Errorf("expected 1 parameter for service restarts"))
+	}
+
+	serviceID := params[0]
+
+	// Get all tasks for the service (not just running ones)
+	filters := map[string][]string{
+		"service": {serviceID},
+	}
+
+	body, err := p.client.Query("tasks", filters)
+	if err != nil {
+		return 0, err
+	}
+
+	var tasks []Task
+	if err = json.Unmarshal(body, &tasks); err != nil {
+		return 0, zbxerr.ErrorCannotUnmarshalJSON.Wrap(err)
+	}
+
+	// Count tasks that have failed/shutdown state with exit code != 0
+	// This indicates the container crashed and was restarted
+	restartCount := 0
+	for _, task := range tasks {
+		// Count tasks that were shutdown/failed with non-zero exit code
+		// These indicate restarts due to crashes
+		if task.Status.State == "failed" || task.Status.State == "shutdown" {
+			if task.Status.ContainerStatus != nil && task.Status.ContainerStatus.ExitCode != 0 {
+				restartCount++
+			}
+		}
+	}
+
+	return restartCount, nil
 }

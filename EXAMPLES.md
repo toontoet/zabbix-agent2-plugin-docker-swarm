@@ -69,6 +69,9 @@ zabbix_get -s localhost -k "swarm.service.replicas_desired[abc123def456]"
 
 # Get running replica count  
 zabbix_get -s localhost -k "swarm.service.replicas_running[abc123def456]"
+
+# Get restart count (crashed tasks)
+zabbix_get -s localhost -k "swarm.service.restarts[abc123def456]"
 ```
 
 ## Docker Compose Stack Example
@@ -122,6 +125,7 @@ zabbix_get -s localhost -k "swarm.stack.health[teststack]"
 SERVICE_ID=$(docker service ls --filter name=teststack_web --format "{{.ID}}")
 zabbix_get -s localhost -k "swarm.service.replicas_desired[$SERVICE_ID]"
 zabbix_get -s localhost -k "swarm.service.replicas_running[$SERVICE_ID]"
+zabbix_get -s localhost -k "swarm.service.restarts[$SERVICE_ID]"
 ```
 
 ## Zabbix Template Import
@@ -197,6 +201,35 @@ docker service create --name standalone-redis redis:alpine
 
 # Compare discovery output
 zabbix_get -s localhost -k "swarm.services.discovery"
+```
+
+### Scenario 4: Monitor Service Restarts
+Test restart detection when a service crashes:
+
+```bash
+# Get a service ID
+SERVICE_ID=$(docker service ls --filter name=teststack_web --format "{{.ID}}")
+
+# Check initial restart count
+echo "Initial restart count:"
+zabbix_get -s localhost -k "swarm.service.restarts[$SERVICE_ID]"
+
+# Simulate a crash by updating the service with a failing command
+docker service update --entrypoint '["sh","-c","exit 1"]' teststack_web
+
+# Wait a few seconds for Docker to restart the task
+sleep 10
+
+# Check updated restart count
+echo "Restart count after crash:"
+zabbix_get -s localhost -k "swarm.service.restarts[$SERVICE_ID]"
+
+# Restore the service
+docker service update --entrypoint '["nginx","-g","daemon off;"]' teststack_web
+
+# In Zabbix, configure a trigger with:
+# Expression: change(/YourHost/swarm.service.restarts[{#SERVICE.ID}])>0
+# This will fire whenever the restart count increases
 ```
 
 ## Troubleshooting Examples

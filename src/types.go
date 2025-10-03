@@ -29,14 +29,23 @@ type GlobalService struct{}
 
 // Task represents a task running as part of a service.
 type Task struct {
-	ID        string     `json:"ID"`
-	ServiceID string     `json:"ServiceID"`
-	Status    TaskStatus `json:"Status"`
+	ID           string     `json:"ID"`
+	ServiceID    string     `json:"ServiceID"`
+	Status       TaskStatus `json:"Status"`
+	DesiredState string     `json:"DesiredState"`
 }
 
 // TaskStatus represents the status of a task.
 type TaskStatus struct {
-	State string `json:"State"`
+	State           string               `json:"State"`
+	Timestamp       string               `json:"Timestamp"`
+	ContainerStatus *TaskContainerStatus `json:"ContainerStatus,omitempty"`
+}
+
+// TaskContainerStatus contains container-specific status information.
+type TaskContainerStatus struct {
+	ContainerID string `json:"ContainerID"`
+	ExitCode    int    `json:"ExitCode"`
 }
 
 // StackHealth represents the health status of a Docker Compose stack.

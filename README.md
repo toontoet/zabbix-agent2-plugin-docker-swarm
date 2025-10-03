@@ -11,6 +11,7 @@ The standard Docker plugin in Zabbix is inadequate for Docker Swarm monitoring b
 - **Service Discovery**: Low-Level Discovery (LLD) for all Docker Swarm services with stack grouping
 - **Stack Discovery**: Low-Level Discovery for Docker Compose stacks
 - **Replica Monitoring**: Track desired vs running replica counts per service
+- **Restart Detection**: Monitor and alert on service task restarts/crashes
 - **Stack Health Monitoring**: Aggregate health status by Docker Compose stack
 - **Stable Monitoring**: Service-based monitoring prevents historical data fragmentation
 - **Cross-Architecture**: Supports both x86_64 and ARM64 Linux systems
@@ -93,7 +94,7 @@ zabbix_get -s localhost -k "swarm.services.discovery"
 
 ## Quick Start
 
-After installation, test the new stack monitoring features:
+After installation, test the monitoring features:
 
 ```bash
 # Test service discovery with stack information
@@ -104,6 +105,9 @@ zabbix_get -s localhost -k "swarm.stacks.discovery"
 
 # Test stack health (replace 'mystack' with actual stack name)
 zabbix_get -s localhost -k "swarm.stack.health[mystack]"
+
+# Test restart monitoring (replace 'service_id' with actual service ID)
+zabbix_get -s localhost -k "swarm.service.restarts[service_id]"
 ```
 
 For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMPLES.md).
@@ -115,6 +119,7 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
 | `swarm.services.discovery` | Service discovery for LLD | JSON array with `{#SERVICE.ID}`, `{#SERVICE.NAME}`, and `{#STACK.NAME}` macros |
 | `swarm.service.replicas_desired[<service_id>]` | Configured replica count | Integer (desired replicas) |
 | `swarm.service.replicas_running[<service_id>]` | Running task count | Integer (running tasks) |
+| `swarm.service.restarts[<service_id>]` | Number of task restarts (crashed tasks) | Integer (restart count) |
 | `swarm.stacks.discovery` | Stack discovery for LLD | JSON array with `{#STACK.NAME}` macro |
 | `swarm.stack.health[<stack_name>]` | Stack health status | JSON with health metrics |
 
@@ -138,10 +143,24 @@ For detailed examples and Zabbix template configuration, see [EXAMPLES.md](EXAMP
    - **Key**: `swarm.service.replicas_running[{#SERVICE.ID}]`
    - **Type**: Zabbix agent
 
-#### Trigger Prototype
-- **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) replica mismatch
-- **Expression**: `last(/Template/swarm.service.replicas_running[{#SERVICE.ID}])<>last(/Template/swarm.service.replicas_desired[{#SERVICE.ID}])`
-- **Severity**: Warning
+3. **Restart Count**
+   - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) restart count
+   - **Key**: `swarm.service.restarts[{#SERVICE.ID}]`
+   - **Type**: Zabbix agent
+   - **Store Value**: Delta (speed per second)
+   - **Note**: Use Delta to track increase in restarts over time
+
+#### Trigger Prototypes
+1. **Replica Mismatch**
+   - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) replica mismatch
+   - **Expression**: `last(/Template/swarm.service.replicas_running[{#SERVICE.ID}])<>last(/Template/swarm.service.replicas_desired[{#SERVICE.ID}])`
+   - **Severity**: Warning
+
+2. **Service Restarted**
+   - **Name**: Service {#SERVICE.NAME} ({#STACK.NAME}) has restarted
+   - **Expression**: `change(/Template/swarm.service.restarts[{#SERVICE.ID}])>0`
+   - **Severity**: Warning
+   - **Description**: A task for this service has crashed and been restarted
 
 ### Stack-Level Monitoring
 
