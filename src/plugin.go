@@ -364,7 +364,9 @@ func (p *swarmPlugin) getDesiredReplicas(_ context.Context, params []string) (an
 
 func (p *swarmPlugin) getServiceDesiredReplicas(service Service) (int, error) {
 	if service.Spec.Mode.Replicated != nil && service.Spec.Mode.Replicated.Replicas != nil {
-		return int(*service.Spec.Mode.Replicated.Replicas), nil
+		replicas := *service.Spec.Mode.Replicated.Replicas
+		// #nosec G115 - Docker Swarm replica counts are reasonable values, overflow extremely unlikely
+		return int(replicas), nil
 	}
 
 	if service.Spec.Mode.Global != nil {

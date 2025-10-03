@@ -3,6 +3,12 @@ run:
   modules-download-mode: readonly
 
 linters-settings:
+  depguard:
+    rules:
+      main:
+        allow:
+          - $gostd
+          - golang.zabbix.com/sdk
   gci:
     sections:
       - standard
@@ -23,6 +29,8 @@ linters-settings:
         arguments:
           - checkPrivateReceivers
           - sayRepetitiveInsteadOfStutters
+  goconst:
+    min-occurrences: 4
 
 linters:
   enable:

@@ -123,6 +123,7 @@ docker stack ps teststack
 ```
 
 ### Test Stack Monitoring
+
 ```bash
 # Discover the new stack
 zabbix_get -s localhost -k "swarm.stacks.discovery"
@@ -153,7 +154,8 @@ zabbix_get -s localhost -k "swarm.service.restarts[$SERVICE_ID]"
    - Value type: `Text`
 
 3. **Calculated Items for Stack Health**:
-   ```
+
+   ```text
    # Health Percentage
    Name: Stack {#STACK.NAME} health percentage
    Formula: jsonpath(last(/Template/swarm.stack.health[{#STACK.NAME}]),"$.health_percentage")
@@ -165,7 +167,8 @@ zabbix_get -s localhost -k "swarm.service.restarts[$SERVICE_ID]"
    ```
 
 ### Trigger Examples
-```
+
+```text
 # Critical: Stack has unhealthy services
 Name: Stack {#STACK.NAME} has unhealthy services
 Expression: jsonpath(last(/Template/swarm.stack.health[{#STACK.NAME}]),"$.unhealthy_services")>0
@@ -180,6 +183,7 @@ Severity: Warning
 ## Monitoring Scenarios
 
 ### Scenario 1: Service Scaling
+
 When you scale a service, the plugin detects the change:
 
 ```bash
@@ -191,6 +195,7 @@ zabbix_get -s localhost -k "swarm.stack.health[teststack]"
 ```
 
 ### Scenario 2: Service Failure Simulation
+
 Simulate a service failure to test alerting:
 
 ```bash
@@ -202,6 +207,7 @@ zabbix_get -s localhost -k "swarm.stack.health[teststack]"
 ```
 
 ### Scenario 3: Stack vs Standalone Services
+
 Compare stack services with standalone services:
 
 ```bash
