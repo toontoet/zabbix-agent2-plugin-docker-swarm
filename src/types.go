@@ -35,6 +35,11 @@ type Task struct {
 	DesiredState string     `json:"DesiredState"`
 }
 
+// Node represents a node running in the swarm cluster.
+type Node struct {
+	ID           string     `json:"ID"`
+}
+
 // TaskStatus represents the status of a task.
 type TaskStatus struct {
 	State           string               `json:"State"`
