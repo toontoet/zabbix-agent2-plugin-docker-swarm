@@ -392,12 +392,24 @@ func (p *swarmPlugin) getServiceDesiredReplicas(service Service) (int, error) {
 	}
 
 	if service.Spec.Mode.Global != nil {
-		// For global services, return 1 as a placeholder
-		// This could be enhanced to count actual nodes
-		return 1, nil
+		return p.getTotalNodes()
 	}
 
 	return 0, errs.New("could not determine desired replicas for service " + service.ID)
+}
+
+func (p *swarmPlugin) getTotalNodes() (int, error) {
+	body, err := p.client.Query("nodes", nil)
+	if err != nil {
+		return 0, err
+	}
+
+	var nodes []Node
+	if err = json.Unmarshal(body, &nodes); err != nil {
+		return 0, errs.Wrap(err, "cannot unmarshal JSON")
+	}
+
+	return len(nodes), nil
 }
 
 func (p *swarmPlugin) getRunningTasks(_ context.Context, params []string) (any, error) {
